@@ -51,6 +51,8 @@ class Assembler(object):
         self.__rri_table = self.__load_table(rripath) if rripath else {}
         # input-output instructions
         self.__ioi_table = self.__load_table(ioipath) if ioipath else {}
+        # pseudo instructions
+        self.pseudo_table = ['org', 'end', 'hex', 'dec']
 
     def read_code(self, path: str):
         """
@@ -135,8 +137,13 @@ class Assembler(object):
         Returns None
         """
         LC = int('0', 16)
+        valid_inst = list(self.__ioi_table.keys()) + list(self.__rri_table.keys()) + list(self.__mri_table.keys()) + \
+                     self.pseudo_table
+
         for i in range(len(self.__asm)):
             code = self.__asm[i][0]
+            if code not in valid_inst and not self.__islabel(code):
+                raise Exception("Bad input at line: {}".format(i + 1))
             if self.__islabel(code):
                 self.__address_symbol_table[code] = LC
                 LC += 1
@@ -157,12 +164,11 @@ class Assembler(object):
         location (in binary too) in self.__bin.
         """
         LC = int('0', 16)
-        pseudo_table = ['org', 'end', 'hex', 'dec']
         for i in range(len(self.__asm)):
-            effective_index = 0 if not self.__islabel(self.__asm[i][0]) else 1
+            effective_index = 0 if self.__asm[i][0] not in self.__address_symbol_table.keys() else 1
             LC_add = str(self.__format2bin(str(LC), 'dec', 12))
             i_eff = self.__asm[i][effective_index]
-            if i_eff in pseudo_table:
+            if i_eff in self.pseudo_table:
                 if i_eff == 'org':
                     LC = int(self.__asm[i][-1], 16)
                 elif i_eff == 'end':
@@ -180,8 +186,8 @@ class Assembler(object):
                 if loc_eff == "I":
                     I = "1"
                     loc_eff = self.__asm[i][-2]
-                if loc_eff+',' in self.__address_symbol_table:
-                    location = self.__address_symbol_table[loc_eff+',']
+                if loc_eff + ',' in self.__address_symbol_table:
+                    location = self.__address_symbol_table[loc_eff + ',']
                     self.__bin[LC_add] = I + opcode + str(self.__format2bin(str(location), "dec", 12))
                 else:
                     location = loc_eff
@@ -194,6 +200,4 @@ class Assembler(object):
                 pass
             elif i_eff in self.__ioi_table.keys():
                 self.__bin[LC_add] = str(self.__ioi_table[i_eff])
-                LC += 1
-            else:
                 LC += 1
